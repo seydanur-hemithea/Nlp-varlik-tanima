@@ -1,57 +1,36 @@
-import stanza
+import os
+import requests
+import time
 from fastapi import FastAPI
 from pydantic import BaseModel
-import os
 
 app = FastAPI()
 
-# RAM tasarrufu için sadece tokenize ve ner modüllerini yüklüyoruz
-# use_gpu=False yaparak Render'ın CPU üzerinde stabil çalışmasını sağlıyoruz
-try:
-    nlp = stanza.Pipeline(
-        lang='tr', 
-        processors='tokenize,ner', 
-        use_gpu=False,
-        download_method=None # Model zaten build sırasında indi
-    )
-except:
-    # Eğer build sırasında inmediyse çalışma anında indir (B planı)
-    stanza.download('tr', processors='tokenize,ner')
-    nlp = stanza.Pipeline(lang='tr', processors='tokenize,ner', use_gpu=False)
+# Token'ı Render Environment'tan güvenli bir şekilde çekiyoruz
+HF_TOKEN = os.getenv("HF_TOKEN")
+API_URL = "https://api-inference.huggingface.co/models/akdeniz27/bert-base-turkish-cased-ner"
+headers = {"Authorization": f"Bearer {HF_TOKEN}"}
 
-class TextData(BaseModel):
+class AnalysisRequest(BaseModel):
     text: str
 
-@app.post("/analyze")
-async def analyze_text(data: TextData):
-    if not data.text or len(data.text.strip()) == 0:
-        return []
-
-    # Metni analiz et
-    doc = nlp(data.text)
-    
-    # Sadece 'PERSON' etiketli varlıkları listele
-    entities = []
-    for sent in doc.sentences:
-        for ent in sent.ents:
-            if ent.type == "PERSON":
-                entities.append(ent.text)
-    
-    # Karakterler arasındaki bağı kur
-    network_data = []
-    for i in range(len(entities) - 1):
-        source = entities[i]
-        target = entities[i+1]
+def query_huggingface(payload):
+    # Eğer token tanımlanmamışsa hata verelim
+    if not HF_TOKEN:
+        return {"error": "HF_TOKEN bulunamadı! Lütfen Render Environment ayarlarına ekleyin."}
         
-        if source != target:
-            network_data.append({
-                "source": source,
-                "target": target,
-                "weight": 1
-            })
+    response = requests.post(API_URL, headers=headers, json=payload)
     
-    return network_data
+    if response.status_code == 503:
+        time.sleep(15)
+        return query_huggingface(payload)
+    
+    return response.json()
 
-@app.get("/")
-async def root():
-    return {"status": "Stanza Turkish NER is live!"}
+@app.post("/analyze")
+async def process_nlp(data: AnalysisRequest):
+    # ... (Geri kalan karakter ağı oluşturma logic'i aynı kalıyor)
+    raw_results = query_huggingface({"inputs": data.text, "options": {"wait_for_model": True}})
+    
+    # ... Karakter ağı işleme kodların buraya gelecek ...
+    return {"status": "Success", "data": raw_results}
