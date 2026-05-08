@@ -1,14 +1,12 @@
 from fastapi import FastAPI
-import spacy
+from transformers import pipeline
 import pandas as pd
 
 app = FastAPI()
 
-# tr_core_news_lg yerine md yazıyoruz
-try:
-    nlp = spacy.load("tr_core_news_md")
-except:
-    print("Model bulunamadı, varsayılan yükleniyor...")
+# Türkçe için eğitilmiş XLM-RoBERTa tabanlı Varlık Tanıma (NER) modeli
+# Bu model SpaCy'den çok daha modern ve güçlüdür.
+ner_pipeline = pipeline("ner", model="akdeniz27/bert-base-turkish-cased-ner", aggregation_strategy="simple")
 
 @app.post("/analyze")
 async def analyze_text(data: dict):
@@ -16,13 +14,13 @@ async def analyze_text(data: dict):
     if not text:
         return []
 
-    doc = nlp(text)
+    # Analiz
+    results = ner_pipeline(text)
     
-    # Sadece Kişi (PERSON) etiketli varlıkları çıkarıyoruz
-    entities = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
+    # Sadece PER (Kişi) etiketlerini alıyoruz
+    entities = [res['word'] for res in results if res['entity_group'] == 'PER']
     
-    # Karakterler arası bağ kurma (Co-occurrence)
-    # Basit mantık: Aynı paragraf/blok içinde ardışık geçen isimleri bağla
+    # Karakter ağını oluştur
     network_data = []
     for i in range(len(entities) - 1):
         network_data.append({
