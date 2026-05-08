@@ -4,8 +4,11 @@ import pandas as pd
 
 app = FastAPI()
 
-# Türkçe Large modelini yüklüyoruz (CPU üzerinde en iyi performans için)
-nlp = spacy.load("tr_core_news_lg")
+# tr_core_news_lg yerine md yazıyoruz
+try:
+    nlp = spacy.load("tr_core_news_md")
+except:
+    print("Model bulunamadı, varsayılan yükleniyor...")
 
 @app.post("/analyze")
 async def analyze_text(data: dict):
