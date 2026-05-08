@@ -1,6 +1,5 @@
 fastapi
 uvicorn
-spacy==3.7.5
+spacy>=3.7.0,<3.8.0
 pandas
 pydantic
-https://github.com/explosion/spacy-models/releases/download/tr_core_news_lg-3.7.0/tr_core_news_lg-3.7.0-py3-none-any.whl
