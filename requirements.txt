@@ -1,5 +1,4 @@
 fastapi
 uvicorn
-stanza
-pandas
+requests
 pydantic
